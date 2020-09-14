@@ -241,7 +241,7 @@ for item in data:
 
 print(list_data)
 
-csv_open_file = open(r'./test.csv', mode='w', encoding='utf8', newline='')
+csv_open_file = open(r'./data/test.csv', mode='w', encoding='utf8', newline='')
 csv_w_file = csv.writer(csv_open_file, dialect='excel')
 csv_w_file.writerow(header)
 csv_w_file.writerows(list_data)
