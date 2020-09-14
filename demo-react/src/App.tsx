@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from 'react';
-import { Timeline, Card, DatePicker } from 'antd';
+import React, { useState, useEffect, useReducer } from 'react';
+import { Timeline, Card, DatePicker, Row, Col, Statistic } from 'antd';
 import axios from 'axios'
 import 'antd/dist/antd.css';
 import 'moment/locale/zh-cn';
@@ -34,6 +34,23 @@ function App() {
   const types = ['支出', '收入']
   let [categories, setCategories] = useState(categoriesModel)
   let [dataSource, setDataSource] = useState(billModel)
+  // const [total, dispatch] = useReducer((state: any, action: any) => {
+  //   switch (action.type) {
+  //     case 'earning':
+  //       return dataSource.reduce((total, curr) => {
+  //         total.amount += (curr.isShow && curr.type) === '0' ? curr.amount : 0
+  //         return total
+  //       }).amount
+
+  //     case 'expenditure':
+  //       return dataSource.reduce((total, curr) => {
+  //         total.amount += (curr.isShow && curr.type) === '1' ? curr.amount : 0
+  //         return total
+  //       }).amount
+  //     default:
+  //       return state;
+  //   }
+  // }, [])
 
   useEffect(() => {
     (async () => {
@@ -49,7 +66,7 @@ function App() {
           ...e,
           key: i.toString(),
           timeStr: getdate(Number(e.time)).replace('00:00:00', ''),
-          categoryStr: categoriesRes.data.filter((se: any) => se.id == e.category)[0].name,
+          categoryStr: categoriesRes.data.filter((se: any) => se.id === e.category)[0].name,
           typeStr: types[e.type],
           isShow: true
         }
@@ -60,24 +77,31 @@ function App() {
 
   function onChange(date: any, dateString: string) {
     setDataSource(dataSource.map(e => (e.isShow = e.timeStr.includes(dateString), e)))
+    console.log(dataSource.filter(e => e.isShow && e.type === '0').map(e => parseFloat(e.amount)))
   }
 
   return (
     <div className="site-card-border-less-wrapper">
-      <Card bordered={false}>
-        <DatePicker onChange={onChange} picker="month" locale={locale} />
+      <Card bordered={false} style={{ minHeight: 300 }}>
+        <Row gutter={16} style={{ paddingBottom: 20 }}>
+          <Col span={8} style={{ textAlign: "center", verticalAlign: "center" }}>
+            <DatePicker onChange={onChange} picker="month" locale={locale} />
+          </Col>
+          {/* <Col span={8} style={{ textAlign: "center" }}><Statistic title="支出" value={dataSource.filter(e => e.isShow && e.type === '0').map(e => parseFloat(e.amount)).reduce((total, curr) => total += curr)} /></Col>
+          <Col span={8} style={{ textAlign: "center" }}><Statistic title="收入" value={dataSource.filter(e => e.isShow && e.type === '1').map(e => parseFloat(e.amount)).reduce((total, curr) => total += curr)} /></Col> */}
+        </Row>
         <Timeline mode='alternate'>
           {
             dataSource.map((e, i) =>
               e.isShow ? (
                 <Timeline.Item
                   key={i}
-                  position={e.type == '0' ? 'left' : 'right'}
-                  color={e.type == '0' ? 'red' : 'green'}
+                  position={e.type === '0' ? 'left' : 'right'}
+                  color={e.type === '0' ? 'red' : 'green'}
                   dot={null}
                 >
-                  <p>{e.timeStr}</p>
-                  <p>{`${e.categoryStr}  ${e.amount}元`}</p>
+                  <div>{e.timeStr}</div>
+                  <div>{`${e.categoryStr}  ${e.amount}元`}</div>
                 </Timeline.Item>
               ) : undefined
             )
