@@ -4,4 +4,12 @@
 .site-card-border-less-wrapper {
   padding: 30px;
   background: #ececec;
+  min-height: 100vh;
+}
+
+.ant-switch {
+  background-color: #52c41a;
+}
+.ant-switch-checked {
+  background-color: #ff4d4f;
 }
