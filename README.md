@@ -17,3 +17,17 @@ pip install CORS
 cd python
 python api.py
 ```
+
+### React 端
+
+##### 进入 React 项目目录
+
+`cd demo-react`
+
+##### 安装依赖
+
+`yarn install`
+
+##### 运行
+
+`yarn start`
