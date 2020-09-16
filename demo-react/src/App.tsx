@@ -38,26 +38,26 @@ function App() {
 
   // 初始化
   useEffect(() => {
-    (async () => {
-      categoriesModel = (await axios('http://127.0.0.1:5000/categories',)).data
-      setCategories(categoriesModel)
-      billModel = (await axios('http://127.0.0.1:5000/bill',)).data
-      setDataSource(billModel.sort((a, b) => parseFloat(b.time) - parseFloat(a.time)).map((e, i) => {
-        return {
-          ...e,
-          key: i.toString(),
-          timeStr: moment(parseInt(e.time)).format('YYYY-MM-DD HH:mm:ss').replace('00:00:00', ''),
-          categoryStr: categoriesModel.filter(se => se.id === e.category)[0].name,
-          typeStr: types[parseInt(e.type)],
-          isShow: true
-        }
-      }));
-      setTotal({
-        expenditure: [...billModel.filter(e => e.type === '0').map(e => parseFloat(e.amount)), 0].reduce((t, c) => t += c),
-        earning: [...billModel.filter(e => e.type === '1').map(e => parseFloat(e.amount)), 0].reduce((t, c) => t += c),
-      })
-    })()
-  }, []);
+    if (!showFormModel)
+      (async () => {
+        [categoriesModel, billModel] = await Promise.all([(await axios('http://127.0.0.1:5000/categories',)).data, await (await axios('http://127.0.0.1:5000/bill',)).data])
+        setCategories(categoriesModel)
+        setDataSource(billModel.sort((a, b) => parseFloat(b.time) - parseFloat(a.time)).map((e, i) => {
+          return {
+            ...e,
+            key: i.toString(),
+            timeStr: moment(parseInt(e.time)).format('YYYY-MM-DD HH:mm:ss').replace('00:00:00', ''),
+            categoryStr: (data => data ? data.name : "")(categoriesModel.filter(se => se.id === e.category)[0]),
+            typeStr: types[parseInt(e.type)],
+            isShow: true
+          }
+        }));
+        setTotal({
+          expenditure: [...billModel.filter(e => e.type === '0').map(e => parseFloat(e.amount)), 0].reduce((t, c) => t += c),
+          earning: [...billModel.filter(e => e.type === '1').map(e => parseFloat(e.amount)), 0].reduce((t, c) => t += c),
+        })
+      })()
+  }, [showFormModel]);
 
   // 筛选 回调
   useEffect(() => {
@@ -73,6 +73,7 @@ function App() {
       earning: [...dataSource.filter(e => e.isShow && e.type === '1').map(e => parseFloat(e.amount)), 0].reduce((t, c) => t += c),
     })
   }, [filterParams])
+
   return (
     <div className="site-card-border-less-wrapper">
       <Card bordered={false} >
@@ -117,24 +118,35 @@ function App() {
 }
 
 function FormModel({ isShow, setShow, categories }: { isShow: boolean, setShow: Function, categories: Array<CategoriesModel> }) {
-  let dataSource = { time: '', type: '0', category: '', amount: '' }
+  let [form] = Form.useForm()
+  const [categorieOption, setCategorieOption] = useState(categories)
   // 提交新增账单
   const onFinish = async (values: any) => {
-    console.log(values)
-    await axios.post('http://127.0.0.1:5000/updateBill', { ...values, firstName: 'fred' })
-    // axios.post('/user', {
-    //   firstName: 'Fred',
-    //   lastName: 'Flintstone'
-    // })
+    console.log({ ...values, time: values.time.valueOf().toString() })
+    await axios.post('http://127.0.0.1:5000/addBill',
+      {
+        ...values,
+        time: values.time.valueOf().toString(),
+        type: values.type === undefined || values.type ? '0' : '1',
+        category: values.category ?? ''
+      })
+    setShow(false)
+    form.resetFields()
   };
+
+  useEffect(() => {
+    setCategorieOption(categories.filter(se => se.type === '0'))
+  }, [categories])
+
   return (
     <Modal
       title="新增账单"
       visible={isShow}
-      onCancel={() => setShow(false)}
+      onCancel={() => (setShow(false), form.resetFields())}
       footer={null}
     >
       <Form
+        form={form}
         labelCol={{ span: 8 }}
         wrapperCol={{ span: 16 }}
         onFinish={onFinish}
@@ -144,23 +156,25 @@ function FormModel({ isShow, setShow, categories }: { isShow: boolean, setShow: 
           name="time"
           rules={[{ required: true, message: '请选择时间!' }]}
         >
-          <DatePicker showTime placeholder='请选择时间' onChange={(e) => { if (e) dataSource.time = e.format('YYYY-MM-DD HH:mm:ss') }} />
+          <DatePicker showTime placeholder='请选择时间' />
         </Form.Item>
         <Form.Item
           label="账单类型"
           name="type"
           rules={[{ required: false, message: '请选择账单类型!' }]}
-          valuePropName='type'
+          valuePropName={'type'}
         >
-          <Switch checkedChildren="支出" unCheckedChildren="收入" defaultChecked onChange={(e) => { if (e) dataSource.type = e ? "1" : "0" }} />
+          <Switch checkedChildren="支出" unCheckedChildren="收入" defaultChecked onChange={(e) => {
+            if (e !== null) setCategorieOption(categories.filter(se => se.type === (e === undefined || e ? '0' : '1')))
+          }} />
         </Form.Item>
         <Form.Item
           label="账单分类"
           name="category"
           rules={[{ message: '请选择账单分类!' }]}
         >
-          <Select placeholder='请选择账单分类' style={{ width: 150 }} onChange={(e) => { if (e) dataSource.category = e.toString() }}>
-            {categories.map(e => (
+          <Select placeholder='请选择账单分类' style={{ width: 150 }}>
+            {categorieOption.map(e => (
               <Select.Option key={e.id} value={e.id}>{e.name}</Select.Option>
             ))}
           </Select>
@@ -171,9 +185,8 @@ function FormModel({ isShow, setShow, categories }: { isShow: boolean, setShow: 
           rules={[{ required: true, message: '请输入金额!' }]}
         >
           <InputNumber
-            formatter={value => `$ ${value}`.replace(/\B(?=(\d{3})+(?!\d))/g, ',')}
-            parser={(value = '') => value.replace(/\$\s?|(,*)/g, '')}
-            onChange={(e) => { if (e) dataSource.amount = e.toString() }}
+            formatter={value => `￥ ${value}`.replace(/\B(?=(\d{3})+(?!\d))/g, ',')}
+            parser={(value = '') => value.replace(/￥\s?|(,*)/g, '')}
             precision={2}
           />
         </Form.Item>
